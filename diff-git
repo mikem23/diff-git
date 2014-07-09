@@ -1,0 +1,104 @@
+#!/usr/bin/python
+
+from optparse import OptionParser
+import sys
+import subprocess
+
+
+def get_options():
+    """process options from command line"""
+
+    usage = _("%prog [options] branch srpm")
+    parser = OptionParser(usage=usage)
+    parser.add_option("-v", "--verbose", action="store_true", default=False,
+                      help=_("be more verbose"))
+    parser.add_option("-q", "--quiet", action="store_true", default=False,
+                      help=_("be less verbose"))
+    parser.add_option("-d", "--debug", action="store_true", default=False,
+                      help=_("show debug output"))
+    # more opts ?
+    (options, args) = parser.parse_args()
+
+    if len(args) != 2:
+        parser.error("The command accepts exactly two arguments")
+    options.repos = args[0:2]
+
+    return options
+
+
+def log_cmd(cmd, logfile=None, fatal=True, **kwargs):
+    """Run command and log output if able"""
+    logger.info('Running command: %s', ' '.join(cmd))
+    if logfile:
+        #kwargs.setdefault('stdout', sys.stdout)
+        kwargs.setdefault('stderr', subprocess.STDOUT)
+        kwargs.setdefault('close_fds', True)
+    proc = subprocess.Popen(cmd, **kwargs)
+    ret = proc.wait()
+    if ret:
+        if fatal:
+            raise RuntimeError, "command failed: %r" % cmd
+        #otherwise
+        logger.warn("Command failed: %r" % cmd)
+    return ret
+
+
+ def get_output(cmd, fatal=True, **kwargs):
+     """Run command and log output if able"""
+     logger.info('Getting output from command: %s', ' '.join(cmd))
+     kwargs['stdout'] = subprocess.PIPE
+     kwargs.setdefault('close_fds', True)
+     if 'stderr' in kwargs:
+         # convenience values
+         if kwargs['stderr'] == 'null':
+             kwargs['stderr'] = file('/dev/null', 'w')
+         elif kwargs['stderr'] == 'keep':
+             kwargs['stderr'] = subprocess.STDOUT
+     proc = subprocess.Popen(cmd, **kwargs)
+     output = proc.communicate()[0]
+     logger.debug("Command output was:\n%s", output)
+     rv = proc.wait()
+     if rv:
+         logger.warn("Command failed: %r" % cmd)
+         if fatal:
+             raise CommandError, "command failed: %r" % cmd
+     return output, rv
+
+
+
+def main():
+    heads = []
+    for repo in options.repos:
+        cmd = ['git', 'ls-remote', '--heads', repo]
+        output, rv = self.get_output(cmd, stderr='null', fatal=True)
+        rows = [ r.split(None, 1) for r in output.splitlines()]
+        hdict = dict([(ref, sha) for (sha, ref) in rows]
+        heads.append(hdict)
+    common = [h for h in heads[1] if h in heads[0]]
+    added = [h for h in heads[1] if h not in heads[0]]
+    dropped = [h for h in heads[0] if h not in heads[1]]
+    if added:
+        logger.warning('added heads: %r', added)
+    if dropped:
+        logger.warning('dropped heads: %r', dropped)
+    #INCOMPLETE
+
+
+if __name__ == '__main__':
+    options = get_options()
+    logger = logging.getLogger("diff-git")
+    if options.debug:
+        log_level = logging.DEBUG
+    elif options.verbose:
+        log_level = logging.INFO
+    elif options.quiet:
+        log_level = logging.ERROR
+    else:
+        log_level = logging.WARNING
+    logger.setLevel(log_level)
+    handler = logging.StreamHandler(sys.stdout)
+    log_fmt = ''
+    handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    main()

@@ -1,14 +1,18 @@
 #!/usr/bin/python
 
+import logging
 from optparse import OptionParser
 import sys
 import subprocess
 
+def _(args):
+    """Stub function for translation"""
+    return args
 
 def get_options():
     """process options from command line"""
 
-    usage = _("%prog [options] branch srpm")
+    usage = _("%prog [options] giturl1 giturl2")
     parser = OptionParser(usage=usage)
     parser.add_option("-v", "--verbose", action="store_true", default=False,
                       help=_("be more verbose"))
@@ -43,7 +47,7 @@ def log_cmd(cmd, logfile=None, fatal=True, **kwargs):
     return ret
 
 
- def get_output(cmd, fatal=True, **kwargs):
+def get_output(cmd, fatal=True, **kwargs):
      """Run command and log output if able"""
      logger.info('Getting output from command: %s', ' '.join(cmd))
      kwargs['stdout'] = subprocess.PIPE
@@ -70,9 +74,9 @@ def main():
     heads = []
     for repo in options.repos:
         cmd = ['git', 'ls-remote', '--heads', repo]
-        output, rv = self.get_output(cmd, stderr='null', fatal=True)
+        output, rv = get_output(cmd, stderr='null', fatal=True)
         rows = [ r.split(None, 1) for r in output.splitlines()]
-        hdict = dict([(ref, sha) for (sha, ref) in rows]
+        hdict = dict([(ref, sha) for (sha, ref) in rows])
         heads.append(hdict)
     common = [h for h in heads[1] if h in heads[0]]
     added = [h for h in heads[1] if h not in heads[0]]
@@ -81,6 +85,10 @@ def main():
         logger.warning('added heads: %r', added)
     if dropped:
         logger.warning('dropped heads: %r', dropped)
+    if common:
+        for h in common:
+            if heads[0][h] != heads[1][h]:
+                logger.warning('head %s differs: %s -> %s', h, heads[0][h], heads[1][h])
     #INCOMPLETE
 
 

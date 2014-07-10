@@ -23,6 +23,8 @@ def get_options():
                       help=_("be less verbose"))
     parser.add_option("-d", "--debug", action="store_true", default=False,
                       help=_("show debug output"))
+    parser.add_option("--ignore-ff", action="store_true", default=False,
+                      help=_("ignore fast-forwards"))
     # more opts ?
     (options, args) = parser.parse_args()
 
@@ -103,11 +105,10 @@ def main():
     if common:
         for h in common:
             if heads[0][h] != heads[1][h]:
-                retval = 1
                 changed.append(h)
-                logger.warning('Head %s differs:', h)
-                logger.warning('  %s', heads[0][h])
-                logger.warning('  -> %s', heads[1][h])
+                logger.debug('Head %s differs:', h)
+                logger.debug('  %s', heads[0][h])
+                logger.debug('  -> %s', heads[1][h])
             else:
                 logger.info('Branch %s matches', h)
     if changed:
@@ -132,13 +133,22 @@ def main():
             output, rv = get_output(cmd, cwd=workdir)
             ref = output.strip()
             if ref ==  heads[0][h]:
+                if options.ignore_ff:
+                    continue
+                retval = 1
                 logger.warning('Head %s is fast-forwarded', h)
+                cmd = ['git', 'log', '--oneline', 'refs/repos/0/%s..refs/repos/1/%s' % (name, name)]
+                log_cmd(cmd, cwd=workdir)
                 # TODO - show log
                 continue
             elif ref == heads[1][h]:
+                retval = 1
                 logger.warning('Head %s is rolled back', h)
+                cmd = ['git', 'log', '--oneline', 'refs/repos/1/%s..refs/repos/0/%s' % (name, name)]
+                log_cmd(cmd, cwd=workdir)
                 # TODO - show log
                 continue
+            retval = 1
             logger.warning('Head %s has deviated', h)
         #shutil.rmtree(workdir)
         #XXX

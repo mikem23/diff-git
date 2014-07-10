@@ -2,8 +2,11 @@
 
 import logging
 from optparse import OptionParser
+import os.path
+import shutil
 import sys
 import subprocess
+import tempfile
 
 def _(args):
     """Stub function for translation"""
@@ -25,14 +28,18 @@ def get_options():
 
     if len(args) != 2:
         parser.error("The command accepts exactly two arguments")
-    options.repos = args[0:2]
+    options.repos = []
+    for repo in args:
+        if os.path.isdir(repo):
+            repo = os.path.abspath(repo)
+            options.repos.append(repo)
 
     return options
 
 
 def log_cmd(cmd, logfile=None, fatal=True, **kwargs):
     """Run command and log output if able"""
-    logger.info('Running command: %s', ' '.join(cmd))
+    logger.debug('Running command: %s', ' '.join(cmd))
     if logfile:
         #kwargs.setdefault('stdout', sys.stdout)
         kwargs.setdefault('stderr', subprocess.STDOUT)
@@ -43,13 +50,13 @@ def log_cmd(cmd, logfile=None, fatal=True, **kwargs):
         if fatal:
             raise RuntimeError, "command failed: %r" % cmd
         #otherwise
-        logger.warn("Command failed: %r" % cmd)
+        logger.debug("Command failed: %r" % cmd)
     return ret
 
 
 def get_output(cmd, fatal=True, **kwargs):
      """Run command and log output if able"""
-     logger.info('Getting output from command: %s', ' '.join(cmd))
+     logger.debug('Getting output from command: %s', ' '.join(cmd))
      kwargs['stdout'] = subprocess.PIPE
      kwargs.setdefault('close_fds', True)
      if 'stderr' in kwargs:
@@ -82,14 +89,60 @@ def main():
     added = [h for h in heads[1] if h not in heads[0]]
     dropped = [h for h in heads[0] if h not in heads[1]]
     if added:
-        logger.warning('added heads: %r', added)
+        logger.warning('Added %i heads:', len(added))
+        for h in added:
+            logger.warning('+ %s', h)
     if dropped:
-        logger.warning('dropped heads: %r', dropped)
+        logger.warning('Dropped %i heads:', len(dropped))
+        for h in dropped:
+            logger.warning('- %s', h)
+    changed = []
     if common:
         for h in common:
             if heads[0][h] != heads[1][h]:
-                logger.warning('head %s differs: %s -> %s', h, heads[0][h], heads[1][h])
-    #INCOMPLETE
+                changed.append(h)
+                logger.warning('Head %s differs:', h)
+                logger.warning('  %s', heads[0][h])
+                logger.warning('  -> %s', heads[1][h])
+            else:
+                logger.info('Branch %s matches', h)
+    if changed:
+        workdir = tempfile.mkdtemp()
+        logger.debug('Using workdir: %s', workdir)
+        log_cmd(['git', 'init', '-q'], cwd=workdir)
+        for h in changed:
+            if h.startswith('refs/heads/'):
+                name = h[11:]
+            else:
+                logger.warning('Unexpected head ref format: %s', h)
+                name = h
+            for n, repo in enumerate(options.repos):
+                cmd = ['git', 'fetch', '-q', '--depth=100', '--no-tags', repo,
+                        '+%s:refs/repos/%i/%s' % (h, n, name)]
+                #TODO depth config
+                #TODO config for checking tags
+                log_cmd(cmd, cwd=workdir)
+            #check ancestry
+            cmd = ['git', 'merge-base', '--is-ancestor',
+                    'refs/repos/0/%s' % name, 'refs/repos/1/%s' % name]
+            rv = log_cmd(cmd, cwd=workdir, fatal=False)
+            if rv == 0:
+                logger.warning('Head %s is fast-forwarded', h)
+                # TODO - show log
+                continue
+            elif rv != 1:
+                raise RuntimeError, 'git exited with status %i' % rv
+            cmd = ['git', 'merge-base', '--is-ancestor',
+                    'refs/repos/1/%s' % name, 'refs/repos/0/%s' % name]
+            rv = log_cmd(cmd, cwd=workdir, fatal=False)
+            if rv == 0:
+                logger.warning('Head %s is rolled back', h)
+                # TODO - show log
+                continue
+            elif rv != 1:
+                raise RuntimeError, 'git exited with status %i' % rv
+            logger.warning('Head %s has deviated', h)
+        shutil.rmtree(workdir)
 
 
 if __name__ == '__main__':

@@ -123,26 +123,21 @@ def main():
                 #TODO config for checking tags
                 log_cmd(cmd, cwd=workdir)
             #check ancestry
-            cmd = ['git', 'merge-base', '--is-ancestor',
+            cmd = ['git', 'merge-base',
                     'refs/repos/0/%s' % name, 'refs/repos/1/%s' % name]
-            rv = log_cmd(cmd, cwd=workdir, fatal=False)
-            if rv == 0:
+            output, rv = get_output(cmd, cwd=workdir)
+            ref = output.strip()
+            if ref ==  heads[0][h]:
                 logger.warning('Head %s is fast-forwarded', h)
                 # TODO - show log
                 continue
-            elif rv != 1:
-                raise RuntimeError, 'git exited with status %i' % rv
-            cmd = ['git', 'merge-base', '--is-ancestor',
-                    'refs/repos/1/%s' % name, 'refs/repos/0/%s' % name]
-            rv = log_cmd(cmd, cwd=workdir, fatal=False)
-            if rv == 0:
+            elif ref == heads[1][h]:
                 logger.warning('Head %s is rolled back', h)
                 # TODO - show log
                 continue
-            elif rv != 1:
-                raise RuntimeError, 'git exited with status %i' % rv
             logger.warning('Head %s has deviated', h)
-        shutil.rmtree(workdir)
+        #shutil.rmtree(workdir)
+        #XXX
 
 
 if __name__ == '__main__':

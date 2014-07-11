@@ -74,7 +74,7 @@ def get_output(cmd, fatal=True, **kwargs):
      if rv:
          logger.warn("Command failed: %r" % cmd)
          if fatal:
-             raise CommandError, "command failed: %r" % cmd
+             raise RuntimeError, "command failed: %r" % cmd
      return output, rv
 
 
@@ -130,7 +130,12 @@ def main():
             #check ancestry
             cmd = ['git', 'merge-base',
                     'refs/repos/0/%s' % name, 'refs/repos/1/%s' % name]
-            output, rv = get_output(cmd, cwd=workdir)
+            output, rv = get_output(cmd, cwd=workdir, fatal=False)
+            if rv:
+                retval = 1
+                logger.warning('Head %s is unrelated', h)
+                #TODO - try fetching greater depth?
+                continue
             ref = output.strip()
             if ref ==  heads[0][h]:
                 if options.ignore_ff:
@@ -139,19 +144,16 @@ def main():
                 logger.warning('Head %s is fast-forwarded', h)
                 cmd = ['git', 'log', '--oneline', 'refs/repos/0/%s..refs/repos/1/%s' % (name, name)]
                 log_cmd(cmd, cwd=workdir)
-                # TODO - show log
                 continue
             elif ref == heads[1][h]:
                 retval = 1
                 logger.warning('Head %s is rolled back', h)
                 cmd = ['git', 'log', '--oneline', 'refs/repos/1/%s..refs/repos/0/%s' % (name, name)]
                 log_cmd(cmd, cwd=workdir)
-                # TODO - show log
                 continue
             retval = 1
             logger.warning('Head %s has deviated', h)
-        #shutil.rmtree(workdir)
-        #XXX
+        shutil.rmtree(workdir)
     return retval
 
 

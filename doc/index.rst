@@ -1,5 +1,10 @@
+diff-git
+========
+
+
 This is a very basic tool to compare two related git repositories
 
+::
     $ ./diff-git --help
     Usage: diff-git [options] giturl1 giturl2
 
@@ -11,3 +16,4 @@ This is a very basic tool to compare two related git repositories
       --ignore-ff    ignore fast-forwards
 
 This is a work in progress. Currently the comparison is very basic.
+
